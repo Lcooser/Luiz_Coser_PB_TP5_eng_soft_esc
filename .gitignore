@@ -1,0 +1,16 @@
+.gradle/
+.gradle-home/
+.gradle-local/
+build/
+out/
+.m2/
+.idea/
+*.iml
+*.log
+*.pdf
+docs/
+coverage/
+reports/
+target/
+bin/
+tmp/

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title th:text="${#strings.isEmpty(recurso.id)} ? 'Novo recurso' : 'Editar recurso'">Recurso</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+<div class="layout">
+    <header class="page-header">
+        <div>
+            <a th:href="@{/recursos}" class="back-link">Voltar para recursos</a>
+            <h1 th:text="${#strings.isEmpty(recurso.id)} ? 'Novo recurso' : 'Editar recurso'">Recurso</h1>
+            <p>Quando um recurso fica inativo, os vinculos existentes sao limpos na camada de servico.</p>
+        </div>
+    </header>
+
+    <main class="panel">
+        <div th:if="${erro}" class="alert alert-error" th:text="${erro}"></div>
+        <form th:action="@{/recursos}" method="post" class="form-grid" id="form-recurso">
+            <label>
+                <span>ID</span>
+                <input type="number" id="recurso-id" name="id" th:value="${recurso.id}" min="1" step="1"/>
+            </label>
+            <label>
+                <span>Titulo</span>
+                <input type="text" id="recurso-titulo" name="titulo" th:value="${recurso.titulo}" maxlength="200"/>
+            </label>
+            <label class="wide">
+                <span>Descricao</span>
+                <textarea id="recurso-descricao" name="descricao" rows="4" maxlength="2000" th:text="${recurso.descricao}"></textarea>
+            </label>
+            <label>
+                <span>Situacao</span>
+                <select id="recurso-situacao" name="situacao">
+                    <option value="ATIVO" th:selected="${recurso.situacao == 'ATIVO'}">Ativo</option>
+                    <option value="INATIVO" th:selected="${recurso.situacao == 'INATIVO'}">Inativo</option>
+                </select>
+            </label>
+            <div class="form-actions wide">
+                <button type="submit" class="btn btn-primary" id="salvar-recurso">Salvar</button>
+                <a th:href="@{/recursos}" class="btn btn-secondary">Cancelar</a>
+            </div>
+        </form>
+    </main>
+</div>
+</body>
+</html>

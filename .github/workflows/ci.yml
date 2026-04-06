@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-coverage:
+    name: Build Test Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission to Gradle wrapper
+        run: chmod +x ./gradlew
+
+      - name: Run main validation
+        shell: bash
+        run: |
+          echo "::group::Gradle validation"
+          ./gradlew clean check postDeployTestClasses bootJar --warning-mode all
+          echo "::endgroup::"
+          echo "::notice title=CI::Build, testes e cobertura concluidos."
+
+      - name: Upload packaged application
+        uses: actions/upload-artifact@v4
+        with:
+          name: tp5-package
+          path: build/libs/tp5-integrado-1.0.0.jar
+          if-no-files-found: error
+          retention-days: 15
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tp5-reports
+          path: |
+            build/reports/tests/test/
+            build/reports/jacoco/test/
+          if-no-files-found: warn
+          retention-days: 15
+
+      - name: Publish job summary
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          summary_path = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          report_path = Path("build/reports/jacoco/test/jacocoTestReport.xml")
+
+          lines = [
+              "## Resultado da CI",
+              "",
+              "- Build Gradle concluido",
+              "- Suite `check` aprovada",
+              "- Suite `postDeployTestClasses` compilada",
+              "- Artefato `tp5-integrado-1.0.0.jar` publicado"
+          ]
+
+          if report_path.exists():
+              root = ET.parse(report_path).getroot()
+              counters = {
+                  counter.attrib["type"]: (
+                      int(counter.attrib["missed"]),
+                      int(counter.attrib["covered"])
+                  )
+                  for counter in root.findall("counter")
+              }
+
+              def pct(kind):
+                  missed, covered = counters[kind]
+                  total = missed + covered
+                  return 0 if total == 0 else covered * 100 / total
+
+              lines.append(f"- Cobertura de instrucoes: {pct('INSTRUCTION'):.2f}%")
+              lines.append(f"- Cobertura de linhas: {pct('LINE'):.2f}%")
+          else:
+              lines.append("- Relatorio JaCoCo indisponivel")
+
+          with summary_path.open("a", encoding="utf-8") as handle:
+              handle.write("\n".join(lines) + "\n")
+          PY

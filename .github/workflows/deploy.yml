@@ -1,0 +1,433 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Ambiente de deploy
+        required: true
+        default: prod
+        type: choice
+        options:
+          - dev
+          - test
+          - prod
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-package:
+    name: Build Package
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission to Gradle wrapper
+        run: chmod +x ./gradlew
+
+      - name: Build application package
+        shell: bash
+        run: |
+          echo "::group::Package build"
+          ./gradlew clean bootJar
+          echo "::endgroup::"
+          echo "::notice title=Deploy::Artefato pronto para distribuicao."
+
+      - name: Upload deploy package
+        uses: actions/upload-artifact@v4
+        with:
+          name: tp5-package
+          path: build/libs/tp5-integrado-1.0.0.jar
+          if-no-files-found: error
+          retention-days: 15
+
+      - name: Publish package summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Pacote de Deploy"
+            echo
+            echo "- Artefato gerado: \`tp5-integrado-1.0.0.jar\`"
+            echo "- Fluxo pronto para distribuir o mesmo pacote entre dev, test e prod"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-dev:
+    name: Deploy Dev
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev')
+    needs: build-package
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: ${{ vars.APP_BASE_URL }}
+    steps:
+      - name: Download deploy package
+        uses: actions/download-artifact@v4
+        with:
+          name: tp5-package
+          path: package
+
+      - name: Validate environment configuration
+        shell: bash
+        run: |
+          echo "::group::Preflight dev"
+          test -n "${{ vars.APP_BASE_URL }}"
+          test -n "${{ vars.AZURE_WEBAPP_NAME }}"
+          test -n "${{ secrets.AZURE_CLIENT_ID }}"
+          test -n "${{ secrets.AZURE_TENANT_ID }}"
+          test -n "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+          echo "::endgroup::"
+
+      - name: Azure login with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          package: package/tp5-integrado-1.0.0.jar
+
+      - name: Publish deploy summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Deploy Dev"
+            echo
+            echo "- Ambiente: dev"
+            echo "- URL: ${{ vars.APP_BASE_URL }}"
+            echo "- Autenticacao: OIDC com Azure"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  selenium-dev:
+    name: Selenium Dev
+    if: needs.deploy-dev.result == 'success'
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: ${{ vars.APP_BASE_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission to Gradle wrapper
+        run: chmod +x ./gradlew
+
+      - name: Run post-deploy Selenium tests
+        shell: bash
+        run: |
+          echo "::group::Selenium dev"
+          ./gradlew postDeployTest -PappBaseUrl="${{ vars.APP_BASE_URL }}"
+          echo "::endgroup::"
+
+      - name: Publish Selenium summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Selenium Dev"
+            echo
+            echo "- Smoke test pos-deploy executado em ${{ vars.APP_BASE_URL }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  dast-dev:
+    name: DAST Dev
+    if: needs.selenium-dev.result == 'success'
+    needs: selenium-dev
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: ${{ vars.APP_BASE_URL }}
+    steps:
+      - name: Run ZAP baseline
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: ${{ vars.APP_BASE_URL }}
+          fail_action: true
+          allow_issue_writing: false
+          artifact_name: zap-dev-report
+
+      - name: Publish DAST summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## DAST Dev"
+            echo
+            echo "- ZAP baseline executado em ${{ vars.APP_BASE_URL }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-test:
+    name: Deploy Test
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'test')
+    needs: build-package
+    runs-on: ubuntu-latest
+    environment:
+      name: test
+      url: ${{ vars.APP_BASE_URL }}
+    steps:
+      - name: Download deploy package
+        uses: actions/download-artifact@v4
+        with:
+          name: tp5-package
+          path: package
+
+      - name: Validate environment configuration
+        shell: bash
+        run: |
+          echo "::group::Preflight test"
+          test -n "${{ vars.APP_BASE_URL }}"
+          test -n "${{ vars.AZURE_WEBAPP_NAME }}"
+          test -n "${{ secrets.AZURE_CLIENT_ID }}"
+          test -n "${{ secrets.AZURE_TENANT_ID }}"
+          test -n "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+          echo "::endgroup::"
+
+      - name: Azure login with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          package: package/tp5-integrado-1.0.0.jar
+
+      - name: Publish deploy summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Deploy Test"
+            echo
+            echo "- Ambiente: test"
+            echo "- URL: ${{ vars.APP_BASE_URL }}"
+            echo "- Trigger principal: release publicada"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  selenium-test:
+    name: Selenium Test
+    if: needs.deploy-test.result == 'success'
+    needs: deploy-test
+    runs-on: ubuntu-latest
+    environment:
+      name: test
+      url: ${{ vars.APP_BASE_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission to Gradle wrapper
+        run: chmod +x ./gradlew
+
+      - name: Run post-deploy Selenium tests
+        shell: bash
+        run: |
+          echo "::group::Selenium test"
+          ./gradlew postDeployTest -PappBaseUrl="${{ vars.APP_BASE_URL }}"
+          echo "::endgroup::"
+
+      - name: Publish Selenium summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Selenium Test"
+            echo
+            echo "- Smoke test pos-deploy executado em ${{ vars.APP_BASE_URL }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  dast-test:
+    name: DAST Test
+    if: needs.selenium-test.result == 'success'
+    needs: selenium-test
+    runs-on: ubuntu-latest
+    environment:
+      name: test
+      url: ${{ vars.APP_BASE_URL }}
+    steps:
+      - name: Run ZAP baseline
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: ${{ vars.APP_BASE_URL }}
+          fail_action: true
+          allow_issue_writing: false
+          artifact_name: zap-test-report
+
+      - name: Publish DAST summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## DAST Test"
+            echo
+            echo "- ZAP baseline executado em ${{ vars.APP_BASE_URL }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-prod:
+    name: Deploy Prod
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod'
+    needs: build-package
+    runs-on: ubuntu-latest
+    environment:
+      name: prod
+      url: ${{ vars.APP_BASE_URL }}
+    steps:
+      - name: Download deploy package
+        uses: actions/download-artifact@v4
+        with:
+          name: tp5-package
+          path: package
+
+      - name: Validate environment configuration
+        shell: bash
+        run: |
+          echo "::group::Preflight prod"
+          test -n "${{ vars.APP_BASE_URL }}"
+          test -n "${{ vars.AZURE_WEBAPP_NAME }}"
+          test -n "${{ secrets.AZURE_CLIENT_ID }}"
+          test -n "${{ secrets.AZURE_TENANT_ID }}"
+          test -n "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+          echo "::endgroup::"
+
+      - name: Azure login with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          package: package/tp5-integrado-1.0.0.jar
+
+      - name: Publish deploy summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Deploy Prod"
+            echo
+            echo "- Ambiente: prod"
+            echo "- URL: ${{ vars.APP_BASE_URL }}"
+            echo "- Aprovacao manual controlada pelas regras do ambiente"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  selenium-prod:
+    name: Selenium Prod
+    if: needs.deploy-prod.result == 'success'
+    needs: deploy-prod
+    runs-on: ubuntu-latest
+    environment:
+      name: prod
+      url: ${{ vars.APP_BASE_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission to Gradle wrapper
+        run: chmod +x ./gradlew
+
+      - name: Run post-deploy Selenium tests
+        shell: bash
+        run: |
+          echo "::group::Selenium prod"
+          ./gradlew postDeployTest -PappBaseUrl="${{ vars.APP_BASE_URL }}"
+          echo "::endgroup::"
+
+      - name: Publish Selenium summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Selenium Prod"
+            echo
+            echo "- Smoke test pos-deploy executado em ${{ vars.APP_BASE_URL }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  dast-prod:
+    name: DAST Prod
+    if: needs.selenium-prod.result == 'success'
+    needs: selenium-prod
+    runs-on: ubuntu-latest
+    environment:
+      name: prod
+      url: ${{ vars.APP_BASE_URL }}
+    steps:
+      - name: Run ZAP baseline
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: ${{ vars.APP_BASE_URL }}
+          fail_action: true
+          allow_issue_writing: false
+          artifact_name: zap-prod-report
+
+      - name: Publish DAST summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## DAST Prod"
+            echo
+            echo "- ZAP baseline executado em ${{ vars.APP_BASE_URL }}"
+          } >> "$GITHUB_STEP_SUMMARY"

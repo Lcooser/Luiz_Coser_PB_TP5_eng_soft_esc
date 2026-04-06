@@ -1,0 +1,101 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.2.0'
+    id 'io.spring.dependency-management' version '1.1.6'
+    id 'jacoco'
+}
+
+group = 'br.edu.esc'
+version = '1.0.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+sourceSets {
+    postDeployTest {
+        java.srcDir file('src/postDeployTest/java')
+        resources.srcDir file('src/postDeployTest/resources')
+        compileClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
+        runtimeClasspath += output + compileClasspath
+    }
+}
+
+configurations {
+    postDeployTestImplementation.extendsFrom testImplementation
+    postDeployTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xlint:all']
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    postDeployTestImplementation 'org.seleniumhq.selenium:selenium-java:4.25.0'
+}
+
+testing {
+    suites {
+        test {
+            useJUnitJupiter()
+        }
+    }
+}
+
+tasks.named('test') {
+    finalizedBy tasks.named('jacocoTestReport')
+}
+
+tasks.register('postDeployTest', Test) {
+    description = 'Executa os testes de fumaca pos-deploy com Selenium.'
+    group = 'verification'
+    dependsOn tasks.named('postDeployTestClasses')
+    testClassesDirs = sourceSets.postDeployTest.output.classesDirs
+    classpath = sourceSets.postDeployTest.runtimeClasspath
+    useJUnitPlatform()
+    shouldRunAfter tasks.named('test')
+    systemProperty 'app.base-url', findProperty('appBaseUrl') ?: System.getenv('APP_BASE_URL') ?: 'http://localhost:8080'
+}
+
+jacoco {
+    toolVersion = '0.8.11'
+}
+
+jacocoTestReport {
+    dependsOn tasks.named('test')
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                minimum = 0.90
+            }
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('jacocoTestCoverageVerification')
+}
+
+bootJar {
+    archiveFileName = 'tp5-integrado-1.0.0.jar'
+}
