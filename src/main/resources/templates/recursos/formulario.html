@@ -19,6 +19,7 @@
     <main class="panel">
         <div th:if="${erro}" class="alert alert-error" th:text="${erro}"></div>
         <form th:action="@{/recursos}" method="post" class="form-grid" id="form-recurso">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <label>
                 <span>ID</span>
                 <input type="number" id="recurso-id" name="id" th:value="${recurso.id}" min="1" step="1"/>

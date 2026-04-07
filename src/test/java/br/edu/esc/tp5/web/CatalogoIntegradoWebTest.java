@@ -8,6 +8,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -24,6 +25,7 @@ class CatalogoIntegradoWebTest {
     @Test
     void removerRecursoRefleteNaListagemDeProdutos() throws Exception {
         mvc.perform(post("/recursos")
+                        .with(csrf())
                         .param("id", "701")
                         .param("titulo", "Manual Integrado")
                         .param("descricao", "Arquivo de apoio")
@@ -32,6 +34,7 @@ class CatalogoIntegradoWebTest {
                 .andExpect(redirectedUrl("/recursos"));
 
         mvc.perform(post("/produtos")
+                        .with(csrf())
                         .param("id", "702")
                         .param("nome", "Kit Integrado")
                         .param("descricao", "Produto vinculado")
@@ -49,7 +52,8 @@ class CatalogoIntegradoWebTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Kit Integrado")));
 
-        mvc.perform(post("/recursos/remover/701"))
+        mvc.perform(post("/recursos/remover/701")
+                        .with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/recursos"));
 

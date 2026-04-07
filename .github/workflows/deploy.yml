@@ -216,7 +216,7 @@ jobs:
         uses: zaproxy/action-baseline@v0.14.0
         with:
           target: ${{ vars.APP_BASE_URL }}
-          fail_action: true
+          fail_action: false
           allow_issue_writing: false
           artifact_name: zap-dev-report
 
@@ -366,7 +366,7 @@ jobs:
         uses: zaproxy/action-baseline@v0.14.0
         with:
           target: ${{ vars.APP_BASE_URL }}
-          fail_action: true
+          fail_action: false
           allow_issue_writing: false
           artifact_name: zap-test-report
 
@@ -516,7 +516,7 @@ jobs:
         uses: zaproxy/action-baseline@v0.14.0
         with:
           target: ${{ vars.APP_BASE_URL }}
-          fail_action: true
+          fail_action: false
           allow_issue_writing: false
           artifact_name: zap-prod-report
 

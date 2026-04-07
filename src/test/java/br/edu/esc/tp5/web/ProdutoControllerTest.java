@@ -24,6 +24,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
@@ -70,6 +71,7 @@ class ProdutoControllerTest {
         when(catalogoIntegradoService.produtoExiste(EntityId.of(1L))).thenReturn(false);
 
         mvc.perform(post("/produtos")
+                        .with(csrf())
                         .param("id", "1")
                         .param("nome", "Produto")
                         .param("descricao", "Descricao")
@@ -86,6 +88,7 @@ class ProdutoControllerTest {
         when(catalogoIntegradoService.listarOpcoesDeRecursos()).thenReturn(List.of());
 
         mvc.perform(post("/produtos")
+                        .with(csrf())
                         .param("id", "abc")
                         .param("nome", "Produto")
                         .param("descricao", "Descricao")
@@ -130,7 +133,8 @@ class ProdutoControllerTest {
 
     @Test
     void removerComSucessoRedireciona() throws Exception {
-        mvc.perform(post("/produtos/remover/1"))
+        mvc.perform(post("/produtos/remover/1")
+                        .with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/produtos"));
 
@@ -142,7 +146,8 @@ class ProdutoControllerTest {
         doThrow(new ProdutoNaoEncontradoException(EntityId.of(5L)))
                 .when(catalogoIntegradoService).removerProduto(EntityId.of(5L));
 
-        mvc.perform(post("/produtos/remover/5"))
+        mvc.perform(post("/produtos/remover/5")
+                        .with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/produtos"));
     }
@@ -152,6 +157,7 @@ class ProdutoControllerTest {
         when(catalogoIntegradoService.listarOpcoesDeRecursos()).thenReturn(List.of());
 
         mvc.perform(post("/produtos")
+                        .with(csrf())
                         .param("id", "1")
                         .param("nome", "Produto")
                         .param("descricao", "Descricao")
@@ -172,6 +178,7 @@ class ProdutoControllerTest {
                 .when(catalogoIntegradoService).salvarProduto(any());
 
         mvc.perform(post("/produtos")
+                        .with(csrf())
                         .param("id", "1")
                         .param("nome", "Produto")
                         .param("descricao", "Descricao")

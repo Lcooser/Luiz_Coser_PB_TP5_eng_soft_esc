@@ -20,6 +20,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
@@ -53,6 +54,7 @@ class RecursoControllerTest {
         when(catalogoIntegradoService.recursoExiste(EntityId.of(1L))).thenReturn(false);
 
         mvc.perform(post("/recursos")
+                        .with(csrf())
                         .param("id", "1")
                         .param("titulo", "Manual")
                         .param("descricao", "Descricao")
@@ -66,6 +68,7 @@ class RecursoControllerTest {
     @Test
     void rejeitaRecursoComIdInvalido() throws Exception {
         mvc.perform(post("/recursos")
+                        .with(csrf())
                         .param("id", "abc")
                         .param("titulo", "Manual")
                         .param("descricao", "Descricao")
@@ -108,7 +111,8 @@ class RecursoControllerTest {
 
     @Test
     void removerComSucessoRedireciona() throws Exception {
-        mvc.perform(post("/recursos/remover/1"))
+        mvc.perform(post("/recursos/remover/1")
+                        .with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/recursos"));
 
@@ -120,7 +124,8 @@ class RecursoControllerTest {
         doThrow(new RecursoNaoEncontradoException(EntityId.of(3L)))
                 .when(catalogoIntegradoService).removerRecurso(EntityId.of(3L));
 
-        mvc.perform(post("/recursos/remover/3"))
+        mvc.perform(post("/recursos/remover/3")
+                        .with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/recursos"));
     }
@@ -128,6 +133,7 @@ class RecursoControllerTest {
     @Test
     void rejeitaSituacaoInvalida() throws Exception {
         mvc.perform(post("/recursos")
+                        .with(csrf())
                         .param("id", "1")
                         .param("titulo", "Manual")
                         .param("descricao", "Descricao")
