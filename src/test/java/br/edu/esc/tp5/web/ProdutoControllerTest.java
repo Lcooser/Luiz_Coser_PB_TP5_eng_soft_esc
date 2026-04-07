@@ -1,5 +1,6 @@
 package br.edu.esc.tp5.web;
 
+import br.edu.esc.tp5.config.SecurityConfig;
 import br.edu.esc.tp5.integration.application.CatalogoIntegradoService;
 import br.edu.esc.tp5.integration.application.OpcaoRecurso;
 import br.edu.esc.tp5.integration.application.ProdutoResumo;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -33,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 @WebMvcTest(ProdutoController.class)
+@Import(SecurityConfig.class)
 class ProdutoControllerTest {
 
     @Autowired

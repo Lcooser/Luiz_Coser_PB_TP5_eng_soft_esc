@@ -1,5 +1,6 @@
 package br.edu.esc.tp5.web;
 
+import br.edu.esc.tp5.config.SecurityConfig;
 import br.edu.esc.tp5.integration.application.CatalogoIntegradoService;
 import br.edu.esc.tp5.integration.application.RecursoResumo;
 import br.edu.esc.tp5.resource.domain.Recurso;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -29,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 @WebMvcTest(RecursoController.class)
+@Import(SecurityConfig.class)
 class RecursoControllerTest {
 
     @Autowired
