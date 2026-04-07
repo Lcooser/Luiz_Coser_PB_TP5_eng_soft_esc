@@ -1,0 +1,56 @@
+name: AWS OIDC
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Ambiente para validar a role OIDC
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev
+          - test
+          - prod
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  validate-aws-oidc:
+    name: Validate AWS OIDC
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Validate environment configuration
+        shell: bash
+        run: |
+          test -n "${{ vars.AWS_REGION }}"
+          test -n "${{ vars.AWS_ROLE_TO_ASSUME }}"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Test identity
+        shell: bash
+        run: aws sts get-caller-identity
+
+      - name: Publish summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## AWS OIDC"
+            echo
+            echo "- Ambiente: ${{ github.event.inputs.environment }}"
+            echo "- Regiao: ${{ vars.AWS_REGION }}"
+            echo "- Role: ${{ vars.AWS_ROLE_TO_ASSUME }}"
+          } >> "$GITHUB_STEP_SUMMARY"
