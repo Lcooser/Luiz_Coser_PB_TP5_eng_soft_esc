@@ -5,6 +5,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.header.writers.CrossOriginOpenerPolicyHeaderWriter;
+import org.springframework.security.web.header.writers.CrossOriginResourcePolicyHeaderWriter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
 @Configuration
 public class SecurityConfig {
@@ -23,14 +26,16 @@ public class SecurityConfig {
                                         "form-action 'self'; frame-ancestors 'none'"
                         ))
                         .frameOptions(frameOptions -> frameOptions.deny())
-                        .referrerPolicy(referrerPolicy -> referrerPolicy.sameOrigin())
+                        .referrerPolicy(referrerPolicy -> referrerPolicy.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.SAME_ORIGIN))
                         .permissionsPolicy(permissions -> permissions.policy(
                                 "accelerometer=(), autoplay=(), camera=(), display-capture=(), fullscreen=(self), " +
                                         "geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), " +
                                         "payment=(), usb=()"
                         ))
-                        .crossOriginOpenerPolicy(crossOriginOpenerPolicy -> crossOriginOpenerPolicy.sameOrigin())
-                        .crossOriginResourcePolicy(crossOriginResourcePolicy -> crossOriginResourcePolicy.sameOrigin())
+                        .crossOriginOpenerPolicy(crossOriginOpenerPolicy -> crossOriginOpenerPolicy
+                                .policy(CrossOriginOpenerPolicyHeaderWriter.CrossOriginOpenerPolicy.SAME_ORIGIN))
+                        .crossOriginResourcePolicy(crossOriginResourcePolicy -> crossOriginResourcePolicy
+                                .policy(CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy.SAME_ORIGIN))
                 )
                 .csrf(Customizer.withDefaults());
 
