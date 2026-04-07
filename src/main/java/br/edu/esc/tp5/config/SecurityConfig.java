@@ -27,11 +27,13 @@ public class SecurityConfig {
                         ))
                         .frameOptions(frameOptions -> frameOptions.deny())
                         .referrerPolicy(referrerPolicy -> referrerPolicy.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.SAME_ORIGIN))
-                        .permissionsPolicy(permissions -> permissions.policy(
+                        .permissionsPolicy(permissions -> {
+                            permissions.policy(
                                 "accelerometer=(), autoplay=(), camera=(), display-capture=(), fullscreen=(self), " +
                                         "geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), " +
                                         "payment=(), usb=()"
-                        ))
+                            );
+                        })
                         .crossOriginOpenerPolicy(crossOriginOpenerPolicy -> crossOriginOpenerPolicy
                                 .policy(CrossOriginOpenerPolicyHeaderWriter.CrossOriginOpenerPolicy.SAME_ORIGIN))
                         .crossOriginResourcePolicy(crossOriginResourcePolicy -> crossOriginResourcePolicy
